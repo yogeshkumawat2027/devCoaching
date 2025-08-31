@@ -1,8 +1,12 @@
 import express from "express";
 import Student from "../models/Student.js";
 import jwt from "jsonwebtoken";
+import cloudinary from "../config/cloudinary.js";
+import multer from "multer";
+import fs from "fs";
 
 const router = express.Router();
+const upload = multer({ dest: "uploads/" });
 
 // Middleware to verify admin token
 const verifyAdmin = (req, res, next) => {
@@ -23,6 +27,37 @@ const verifyAdmin = (req, res, next) => {
     res.status(401).json({ message: "Invalid token" });
   }
 };
+
+// Upload student image (admin only)
+router.post("/student/:rollNo/upload-image", verifyAdmin, upload.single("image"), async (req, res) => {
+  try {
+    const student = await Student.findOne({ rollNo: req.params.rollNo });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const imagePath = req.file.path;
+    const result = await cloudinary.uploader.upload(imagePath, {
+      folder: "students",
+      public_id: `student_${student.rollNo}`,
+      overwrite: true
+    });
+
+    // Remove local file after upload
+    fs.unlinkSync(imagePath);
+
+    student.imageUrl = result.secure_url;
+    await student.save();
+
+    res.json({ 
+      message: "Image uploaded successfully", 
+      imageUrl: result.secure_url, 
+      student: student.name 
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error uploading image", error: err.message });
+  }
+});
 
 // Get all students (admin only)
 router.get("/students", verifyAdmin, async (req, res) => {
