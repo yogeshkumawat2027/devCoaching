@@ -112,6 +112,70 @@ router.post("/student/:rollNo/result", verifyAdmin, async (req, res) => {
   }
 });
 
+// Add bulk student results (admin only)
+router.post("/bulk-results", verifyAdmin, async (req, res) => {
+  try {
+    const { batch, examName, subject, totalMarks, examDate, studentResults } = req.body;
+
+    const results = [];
+    const errors = [];
+
+    // Process each student result
+    for (const studentResult of studentResults) {
+      try {
+        const { rollNo, marksObtained } = studentResult;
+
+        // Find student by roll number and batch
+        const student = await Student.findOne({ rollNo, batch });
+        if (!student) {
+          errors.push({
+            rollNo,
+            error: `Student with roll number ${rollNo} not found in ${batch} batch`
+          });
+          continue;
+        }
+
+        // Create result object
+        const result = {
+          examName,
+          subject,
+          marksObtained: parseInt(marksObtained),
+          totalMarks: parseInt(totalMarks),
+          date: examDate ? new Date(examDate) : new Date()
+        };
+
+        // Add result to student
+        student.results.push(result);
+        await student.save();
+
+        results.push({
+          rollNo,
+          studentName: student.name,
+          marksObtained,
+          percentage: Math.round((marksObtained / totalMarks) * 100)
+        });
+
+      } catch (error) {
+        errors.push({
+          rollNo: studentResult.rollNo,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      message: `Bulk results processed: ${results.length} successful, ${errors.length} failed`,
+      successCount: results.length,
+      errorCount: errors.length,
+      results,
+      errors
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: "Error processing bulk results", error: err.message });
+  }
+});
+
 // Update student fees (admin only)
 router.put("/student/:rollNo/fees", verifyAdmin, async (req, res) => {
   try {
