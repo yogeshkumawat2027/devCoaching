@@ -82,4 +82,28 @@ router.get("/:rollNo/results", async (req, res) => {
   }
 });
 
+// ✅ Get Student by Parent Phone Number
+router.get("/by-phone/:phone", async (req, res) => {
+  try {
+    const { phone } = req.params;
+    
+    // Find student by parent phone number
+    const student = await Student.findOne({ 
+      $or: [
+        { parentPhone: phone },
+        { phone: phone } // In case phone is stored in 'phone' field
+      ]
+    });
+    
+    if (!student) {
+      return res.status(404).json({ message: "No student found with this phone number" });
+    }
+
+    // Return complete student data including results
+    res.json(student);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching student data", error: err.message });
+  }
+});
+
 export default router;
