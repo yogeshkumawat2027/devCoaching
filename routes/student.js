@@ -1,7 +1,36 @@
+
 import express from "express";
 import Student from "../models/Student.js";
+import cloudinary from "../config/cloudinary.js";
+import multer from "multer";
+import fs from "fs";
+
 
 const router = express.Router();
+const upload = multer({ dest: "uploads/" });
+router.post("/:rollNo/upload-image", upload.single("image"), async (req, res) => {
+  try {
+    const student = await Student.findOne({ rollNo: req.params.rollNo });
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    const imagePath = req.file.path;
+    const result = await cloudinary.uploader.upload(imagePath, {
+      folder: "students",
+      public_id: `student_${student.rollNo}`,
+      overwrite: true
+    });
+
+    // Remove local file after upload
+    fs.unlinkSync(imagePath);
+
+    student.imageUrl = result.secure_url;
+    await student.save();
+
+    res.json({ message: "Image uploaded", imageUrl: result.secure_url, student });
+  } catch (err) {
+    res.status(500).json({ message: "Error uploading image", error: err.message });
+  }
+});
 
 // ✅ Add Student
 router.post("/add", async (req, res) => {
