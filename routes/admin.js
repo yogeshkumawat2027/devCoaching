@@ -227,6 +227,48 @@ router.post("/student/add", verifyAdmin, async (req, res) => {
   }
 });
 
+// Update student (admin only)
+router.put("/students/:id", verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // Check if parent phone is being updated and if it's already used by another student
+    if (updateData.parentPhone) {
+      const existingStudent = await Student.findOne({ 
+        parentPhone: updateData.parentPhone, 
+        _id: { $ne: id } // Exclude current student
+      });
+      
+      if (existingStudent) {
+        return res.status(400).json({ 
+          message: `This parent phone number is already registered with student: ${existingStudent.name} (Roll No: ${existingStudent.rollNo})`,
+          duplicateStudent: {
+            name: existingStudent.name,
+            rollNo: existingStudent.rollNo,
+            class: existingStudent.class
+          }
+        });
+      }
+    }
+
+    // Find and update the student
+    const student = await Student.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.json({ message: "Student updated successfully", student });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating student", error: err.message });
+  }
+});
+
 // Upload student image (admin only)
 router.post("/student/:rollNo/upload-image", verifyAdmin, upload.single('image'), async (req, res) => {
   try {
